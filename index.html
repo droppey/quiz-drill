@@ -79,31 +79,19 @@ h2{font-size:1.1rem;margin:22px 0 4px}
 </div>
 <div class="foot"><div class="in" id="foot"></div></div>
 
-<script src="banks/index.js"></script>
 <script>
 const NUM = ["①","②","③","④","⑤","⑥"];
 // ---------- 題庫 ----------
 const BANKS = [];
 function registerBank(b){
   // 資料自檢：格式壞掉的題目會在 console 報錯
-  b.questions.forEach((x,i)=>{ if(!x.q||!x.e||!(x.o.length>=2&&x.o.length<=NUM.length)||!(x.a>=1&&x.a<=x.o.length)) console.error("bad question", b.id, i+1); });
+  if (BANKS.some(o => bankKey(o) === bankKey(b))) return console.error("duplicate bank id", b.id);
+  b.questions.forEach((x,i)=>{ if(!x.q||!x.e||!(Array.isArray(x.o)&&x.o.length>=2&&x.o.length<=NUM.length)||!(x.a>=1&&x.a<=x.o.length)) console.error("bad question", b.id, i+1); });
   BANKS.push(b);
 }
 let BANK = null, QUESTIONS = [], KEY = "", MKEY = "";
 const bankKey = b => b.storageKey || ("quiz-" + b.id);
 function readJSON(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
-
-function loadBanks(){
-  let i = 0;
-  (function next(){
-    if (i >= BANK_FILES.length) return renderBanks();
-    const el = document.createElement("script");
-    el.src = "banks/" + BANK_FILES[i++];
-    el.onload = next;
-    el.onerror = () => { console.warn("載入失敗：" + el.src); next(); };
-    document.body.appendChild(el);
-  })();
-}
 
 function renderBanks(){
   BANK = null;
@@ -114,7 +102,7 @@ function renderBanks(){
     const k = bankKey(b), st = readJSON(k + "-quiz-v1"), mk = readJSON(k + "-marks-v1") || {};
     const favs = Object.values(mk).filter(m => m.f).length;
     const n = b.questions.length;
-    const avg = (b.questions.reduce((t, _, j) => t + ((mk[j] && mk[j].s) || 0), 0) / n).toFixed(1);
+    const avg = (n ? b.questions.reduce((t, _, j) => t + ((mk[j] && mk[j].s) || 0), 0) / n : 0).toFixed(1);
     const status = st && st.phase === "quiz" && st.pool && st.pool.length ? `・進行中（第 ${st.round} 輪）` : st && st.phase === "result" ? "・待重做錯題" : "";
     return `<div class="choice" onclick="selectBank(${i})"><div><b>${esc(b.title)}</b>
       <div class="hist" style="margin:0">${esc(b.desc || "")}</div>
@@ -306,7 +294,9 @@ function render(){
   else renderDone();
 }
 
-loadBanks();
 </script>
+<!-- 題庫清單：新增題庫就在這裡加一行（顯示順序 = 這裡的順序） -->
+<script src="banks/ifrs-derivatives.js"></script>
+<script>renderBanks();</script>
 </body>
 </html>

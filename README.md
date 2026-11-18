@@ -28,6 +28,8 @@ registerBank({
 });
 ```
 
-2. 在 `banks/index.js` 的 `BANK_FILES` 加上 `"xxx.js"`。
+2. 在 `index.html` 最下面的題庫清單加一行 `<script src="banks/xxx.js"></script>`。
+
+`id`（或 `storageKey`）重複的題庫不會載入，console 會顯示 `duplicate bank id`。改完跑 `node test.js` 檢查。
 
 **新增題目只能加在題庫最後面，不要在中間插入或刪除**——星等與收藏是用題目順序（位置）記的，插入會讓後面的標記全部錯位。格式錯誤的題目會在瀏覽器 console 顯示 `bad question <id> <題號>`。
