@@ -14,11 +14,12 @@
 
 | 檔案 | 題庫 | 題數 |
 |---|---|---|
+| `banks/derivatives-intro.js` | 第一篇 衍生性商品概論 | 239 |
 | `banks/ifrs-derivatives.js` | 第二篇 衍生性商品之會計處理 | 42 |
 | `banks/tabf-derivatives-18.js` | 衍生性金融商品銷售人員資格測驗　第 18 期 | 60 |
 | `banks/tabf-derivatives-19.js` | 衍生性金融商品銷售人員資格測驗　第 19 期 | 60 |
 | `banks/tabf-derivatives-20.js` | 衍生性金融商品銷售人員資格測驗　第 20 期 | 60 |
-| `banks/derivatives-intro.js` | 第一篇 衍生性商品概論 | 239 |
+
 
 ### 新增題庫
 
