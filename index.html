@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>衍生性商品之會計處理｜刷題</title>
+<title>刷題</title>
 <style>
 :root{
   --bg:#f6f4ef;--card:#fff;--ink:#1f2328;--muted:#6b6f76;--line:#e3e0d8;
@@ -67,8 +67,8 @@ h2{font-size:1.1rem;margin:22px 0 4px}
 <body>
 <div class="wrap">
   <header>
-    <h1>第二篇　衍生性商品之會計處理</h1>
-    <p>練習題 42 題（IFRS 9 / IFRS 13 / IFRS 7 / IAS 32）</p>
+    <h1 id="title">刷題</h1>
+    <p id="subtitle"></p>
   </header>
   <div class="bar">
     <span class="round" id="round"></span>
@@ -79,15 +79,63 @@ h2{font-size:1.1rem;margin:22px 0 4px}
 </div>
 <div class="foot"><div class="in" id="foot"></div></div>
 
-<script src="questions.js"></script>
+<script src="banks/index.js"></script>
 <script>
-const NUM = ["①","②","③","④"];
-const KEY = "ifrs-deriv-quiz-v1";
+const NUM = ["①","②","③","④","⑤","⑥"];
+// ---------- 題庫 ----------
+const BANKS = [];
+function registerBank(b){ BANKS.push(b); }
+let BANK = null, QUESTIONS = [], KEY = "", MKEY = "";
+const bankKey = b => b.storageKey || ("quiz-" + b.id);
+function readJSON(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+
+function loadBanks(){
+  let i = 0;
+  (function next(){
+    if (i >= BANK_FILES.length) return renderBanks();
+    const el = document.createElement("script");
+    el.src = "banks/" + BANK_FILES[i++];
+    el.onload = next;
+    el.onerror = () => { console.warn("載入失敗：" + el.src); next(); };
+    document.body.appendChild(el);
+  })();
+}
+
+function renderBanks(){
+  BANK = null;
+  $("title").textContent = "刷題"; $("subtitle").textContent = "選擇題目庫";
+  document.title = "刷題";
+  $("round").textContent = "題庫"; $("count").textContent = `${BANKS.length} 個`; $("progbar").style.width = "0";
+  $("main").innerHTML = `<div class="setup">${BANKS.map((b, i) => {
+    const k = bankKey(b), st = readJSON(k + "-quiz-v1"), mk = readJSON(k + "-marks-v1") || {};
+    const favs = Object.values(mk).filter(m => m.f).length;
+    const n = b.questions.length;
+    const avg = (b.questions.reduce((t, _, j) => t + ((mk[j] && mk[j].s) || 0), 0) / n).toFixed(1);
+    const status = st && st.phase === "quiz" && st.pool && st.pool.length ? `・進行中（第 ${st.round} 輪）` : st && st.phase === "result" ? "・待重做錯題" : "";
+    return `<div class="choice" onclick="selectBank(${i})"><div><b>${esc(b.title)}</b>
+      <div class="hist" style="margin:0">${esc(b.desc || "")}</div>
+      <div class="hist" style="margin:0">${n} 題・平均 ${avg}★・${favs} ♥${status}</div></div><span class="n">›</span></div>`;
+  }).join("") || "<p>沒有題庫</p>"}</div>`;
+  $("foot").innerHTML = `<span style="flex:1"></span>`;
+}
+
+function selectBank(i){
+  BANK = BANKS[i]; QUESTIONS = BANK.questions;
+  KEY = bankKey(BANK) + "-quiz-v1"; MKEY = bankKey(BANK) + "-marks-v1";
+  M = readJSON(MKEY) || {};
+  $("title").textContent = BANK.title; $("subtitle").textContent = `${QUESTIONS.length} 題・${BANK.desc || ""}`;
+  document.title = BANK.title.replace(/\s+/g, " ") + "｜刷題";
+  S = load();
+  if (!S || !Array.isArray(S.pool) || (S.phase !== "setup" && !S.pool.length)) S = fresh();
+  if (!S.scope) { S.scope = "all"; S.minStar = 3; }
+  if (S.phase === "done") S = Object.assign(fresh(), {scope:S.scope, minStar:S.minStar});
+  render(); window.scrollTo(0,0);
+}
+function backToBanks(){ renderBanks(); window.scrollTo(0,0); }
+
 let S; // {round, pool:[idx], answers:{idx:choice}, phase:'quiz'|'result'|'done', lastWrong:[], history:[{round,total,correct}]}
 
-const MKEY = "ifrs-deriv-marks-v1";
 let M = {}; // {qi: {s:0-5, f:0|1}}
-try{ M = JSON.parse(localStorage.getItem(MKEY)) || {}; }catch(e){ M = {}; }
 function saveMarks(){ try{ localStorage.setItem(MKEY, JSON.stringify(M)); }catch(e){} }
 const star = i => (M[i] && M[i].s) || 0;
 const fav = i => (M[i] && M[i].f) || 0;
@@ -122,13 +170,13 @@ function scopePool(scope, minStar){
 }
 function renderSetup(){
   const ms = S.minStar || 3;
-  const c = {all:42, fav:scopePool("fav").length, star:scopePool("star", ms).length};
+  const c = {all:QUESTIONS.length, fav:scopePool("fav").length, star:scopePool("star", ms).length};
   const opt = (v, label) => `<label class="choice${S.scope===v?" sel":""}"><input type="radio" name="scope" ${S.scope===v?"checked":""} onchange="S.scope='${v}';renderSetup()"> ${label}<span class="n">${c[v]} 題</span></label>`;
   const sel = `<select onchange="S.minStar=+this.value;S.scope='star';renderSetup()" onclick="event.stopPropagation()">${[1,2,3,4,5].map(n=>`<option ${n===ms?"selected":""}>${n}</option>`).join("")}</select>`;
   $("main").innerHTML = `<div class="setup"><h2>選擇練習範圍</h2>
     ${opt("all","全部題目")}${opt("fav","♥ 只刷收藏")}${opt("star",`★ 只刷 ≥ ${sel} 星`)}</div>`;
   const n = c[S.scope];
-  $("foot").innerHTML = `<span class="msg">${n?"":"這個範圍目前沒有題目"}</span><button class="primary" ${n?"":"disabled style='opacity:.4'"} onclick="startQuiz()">開始作答</button>`;
+  $("foot").innerHTML = `<button class="ghost" onclick="backToBanks()">‹ 題庫</button><span class="msg">${n?"":"這個範圍目前沒有題目"}</span><button class="primary" ${n?"":"disabled style='opacity:.4'"} onclick="startQuiz()">開始作答</button>`;
   $("round").textContent = "準備"; $("count").textContent = ""; $("progbar").style.width = "0";
 }
 function startQuiz(){
@@ -230,7 +278,7 @@ function renderDone(){
   $("main").innerHTML = `<div class="done"><div class="big">🎉</div><h2>全部答對！</h2>
     <p>${total === 1 ? "第一輪就全對，太強了。" : `經過 ${total} 輪，${S.history[0].total} 題全部拿下。`}</p>
     <div class="hist">${histLine()}</div></div>`;
-  $("foot").innerHTML = `<span style="flex:1"></span><button class="primary" onclick="restart()">重新開始</button>`;
+  $("foot").innerHTML = `<button class="ghost" onclick="backToBanks()">‹ 題庫</button><span style="flex:1"></span><button class="primary" onclick="restart()">重新開始</button>`;
   header();
 }
 
@@ -249,10 +297,7 @@ function render(){
   else renderDone();
 }
 
-S = load();
-if (!S || !Array.isArray(S.pool) || (S.phase !== "setup" && !S.pool.length)) S = fresh();
-if (!S.scope) { S.scope = "all"; S.minStar = 3; }
-render();
+loadBanks();
 </script>
 </body>
 </html>
