@@ -37,6 +37,22 @@ run("pick(1, 1); submitQuiz()");  // 上面已警告過一次，這次按交卷�
 assert.deepStrictEqual(val("[star(1), fav(1), star(2), fav(2), star(0)]"), [1, 0, 0, 1, 2]);
 assert.deepStrictEqual(val("S.lastWrong"), [2]);
 
+// 隨機挑 N 題：N 題不重複、都在題庫內；N 大於題數時就是全部
+run("restart(); S.scope='rand'; S.randN=2; startQuiz()");
+const rp = val("S.pool");
+assert.ok(rp.length === 2 && new Set(rp).size === 2 && rp.every(i => i >= 0 && i < 3), "隨機挑題錯誤：" + rp);
+run("restart(); S.scope='rand'; S.randN=99; startQuiz()");
+assert.deepStrictEqual(val("[...S.pool].sort()"), [0, 1, 2]);
+
+// 備份：匯出再匯入要還原紀錄；壞檔案要整個拒絕
+const backup = run("exportRecords()");
+const saved = { ...store };
+for (const k in store) delete store[k];
+run(`parseRecords(${JSON.stringify(backup)}).forEach(([k, v]) => localStorage.setItem(k, v))`);
+assert.deepStrictEqual({ ...store }, saved, "匯出再匯入後紀錄不一致");
+for (const bad of ["not json", '{"data":{}}', '{"data":{"x-quiz-v1":"{broken"}}', '{"data":{"evil":"1"}}'])
+  assert.throws(() => run(`parseRecords(${JSON.stringify(bad)})`), "壞檔案沒被拒絕：" + bad);
+
 // 題庫檔防呆：id 重複不載入、選項打錯字只報錯不崩潰、空題庫不顯示 NaN
 const n = run("BANKS.length");
 run(`registerBank({id:"t", title:"複製忘了改 id", questions:[]})`);

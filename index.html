@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>刷題</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-180.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="刷題">
 <style>
 :root{
   --bg:#f6f4ef;--card:#fff;--ink:#1f2328;--muted:#6b6f76;--line:#e3e0d8;
@@ -108,8 +114,47 @@ function renderBanks(){
       <div class="hist" style="margin:0">${esc(b.desc || "")}</div>
       <div class="hist" style="margin:0">${n} 題・平均 ${avg}★・${favs} ♥${status}</div></div><span class="n">›</span></div>`;
   }).join("") || "<p>沒有題庫</p>"}</div>`;
-  $("foot").innerHTML = `<span style="flex:1"></span>`;
+  $("foot").innerHTML = `<button class="ghost" onclick="exportFile()">匯出紀錄</button><button class="ghost" onclick="$('imp').click()">匯入紀錄</button><input type="file" id="imp" accept=".json,application/json" hidden onchange="importFile(this.files[0]);this.value=''"><span style="flex:1"></span>`;
 }
+
+// ---------- 備份：匯出／匯入所有題庫的進度與標記 ----------
+const RECORD_KEY = /-(quiz|marks)-v1$/;
+function exportRecords(){
+  const data = {};
+  BANKS.forEach(b => ["-quiz-v1", "-marks-v1"].forEach(s => {
+    const k = bankKey(b) + s, v = localStorage.getItem(k);
+    if (v != null) data[k] = v;
+  }));
+  return JSON.stringify({app:"quiz-drill", v:1, data});
+}
+// 先全部檢查過才寫入，壞檔案不會覆蓋掉現有紀錄
+function parseRecords(text){
+  const j = JSON.parse(text);
+  const rows = Object.entries((j && j.data) || {}).filter(([k, v]) => RECORD_KEY.test(k) && typeof v === "string");
+  rows.forEach(([, v]) => JSON.parse(v));
+  if (!rows.length) throw new Error("no records");
+  return rows;
+}
+function exportFile(){
+  try{
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([exportRecords()], {type:"application/json"}));
+    a.download = `刷題紀錄-${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }catch(e){ alert("匯出失敗：" + e.message); }
+}
+function importFile(file){
+  if (!file) return;
+  file.text().then(t => {
+    let rows;
+    try{ rows = parseRecords(t); }catch(e){ return alert("檔案格式不對，沒有匯入。"); }
+    if (!confirm(`匯入 ${rows.length} 筆紀錄？這台裝置上相同題庫的紀錄會被覆蓋。`)) return;
+    rows.forEach(([k, v]) => localStorage.setItem(k, v));
+    renderBanks();
+  }).catch(e => alert("匯入失敗：" + e.message));
+}
+// 請瀏覽器不要自動清掉這個網站的資料（不支援就略過）
+if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) navigator.storage.persist();
 
 function selectBank(i){
   BANK = BANKS[i]; QUESTIONS = BANK.questions;
@@ -124,7 +169,7 @@ function selectBank(i){
   }
   if (!S || !Array.isArray(S.pool) || (S.phase !== "setup" && !S.pool.length)) S = fresh();
   if (!S.scope) { S.scope = "all"; S.minStar = 3; }
-  if (S.phase === "done") S = Object.assign(fresh(), {scope:S.scope, minStar:S.minStar});
+  if (S.phase === "done") S = Object.assign(fresh(), {scope:S.scope, minStar:S.minStar, randN:S.randN});
   render(); window.scrollTo(0,0);
 }
 function backToBanks(){ renderBanks(); window.scrollTo(0,0); }
@@ -158,30 +203,35 @@ function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} 
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
 function fresh(){ return {round:1, pool:[], answers:{}, phase:"setup", lastWrong:[], history:[], scope:"all", minStar:3}; }
 
-function scopePool(scope, minStar){
+function scopePool(scope, minStar, randN){
   const all = QUESTIONS.map((_,i)=>i);
   if (scope === "fav") return all.filter(i => fav(i));
   if (scope === "star") return all.filter(i => star(i) <= minStar);
+  if (scope === "rand"){  // Fisher–Yates 洗牌後取前 n 題
+    for (let i = all.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [all[i], all[j]] = [all[j], all[i]]; }
+    return all.slice(0, randN);
+  }
   return all;
 }
 function renderSetup(){
   const ms = S.minStar ?? 3;
-  const c = {all:QUESTIONS.length, fav:scopePool("fav").length, star:scopePool("star", ms).length};
+  const rn = S.randN || 10;
+  const c = {all:QUESTIONS.length, fav:scopePool("fav").length, star:scopePool("star", ms).length, rand:Math.min(rn, QUESTIONS.length)};
   const opt = (v, label) => `<label class="choice${S.scope===v?" sel":""}"><input type="radio" name="scope" ${S.scope===v?"checked":""} onchange="S.scope='${v}';renderSetup()"> ${label}<span class="n">${c[v]} 題</span></label>`;
   const sel = `<select onchange="S.minStar=+this.value;S.scope='star';renderSetup()" onclick="event.stopPropagation()">${[0,1,2,3,4,5].map(n=>`<option ${n===ms?"selected":""}>${n}</option>`).join("")}</select>`;
   $("main").innerHTML = `<div class="setup"><h2>選擇練習範圍</h2>
-    ${opt("all","全部題目")}${opt("fav","♥ 只刷收藏")}${opt("star",`★ 只刷 ≤ ${sel} 星`)}</div>`;
+    ${opt("all","全部題目")}${opt("fav","♥ 只刷收藏")}${opt("star",`★ 只刷 ≤ ${sel} 星`)}${opt("rand",`🎲 隨機挑 <input type="number" min="1" max="${QUESTIONS.length}" value="${rn}" style="width:4em" onchange="S.randN=Math.max(1,Math.round(+this.value)||1);S.scope='rand';renderSetup()" onclick="event.stopPropagation()"> 題`)}</div>`;
   const n = c[S.scope];
   $("foot").innerHTML = `<button class="ghost" onclick="backToBanks()">‹ 題庫</button><span class="msg">${n?"":"這個範圍目前沒有題目"}</span><button class="primary" ${n?"":"disabled style='opacity:.4'"} onclick="startQuiz()">開始作答</button>`;
   $("round").textContent = "準備"; $("count").textContent = ""; $("progbar").style.width = "0";
 }
 function startQuiz(){
-  S.pool = scopePool(S.scope, S.minStar ?? 3);
+  S.pool = scopePool(S.scope, S.minStar ?? 3, S.randN || 10);
   if (!S.pool.length) return;
   S.answers = {}; S.round = 1; S.history = []; S.lastWrong = []; S.phase = "quiz";
   save(); render(); window.scrollTo(0,0);
 }
-const scopeLabel = () => S.scope === "fav" ? "收藏題" : S.scope === "star" ? `≤${S.minStar}星` : "全部";
+const scopeLabel = () => S.scope === "fav" ? "收藏題" : S.scope === "star" ? `≤${S.minStar}星` : S.scope === "rand" ? `隨機${Math.min(S.randN||10, QUESTIONS.length)}題` : "全部";
 
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
@@ -285,7 +335,7 @@ function retry(){
   S.round += 1; S.phase = "quiz";
   save(); render(); window.scrollTo(0,0);
 }
-function restart(){ const sc=S.scope, ms=S.minStar; S = fresh(); S.scope=sc||"all"; S.minStar=ms??3; save(); render(); window.scrollTo(0,0); }
+function restart(){ const sc=S.scope, ms=S.minStar, rn=S.randN; S = fresh(); S.scope=sc||"all"; S.minStar=ms??3; S.randN=rn||10; save(); render(); window.scrollTo(0,0); }
 
 function render(){
   if (S.phase === "setup") renderSetup();
@@ -297,6 +347,9 @@ function render(){
 </script>
 <!-- 題庫清單：新增題庫就在這裡加一行（顯示順序 = 這裡的順序） -->
 <script src="banks/ifrs-derivatives.js"></script>
+<script src="banks/tabf-derivatives-18.js"></script>
+<script src="banks/tabf-derivatives-19.js"></script>
+<script src="banks/tabf-derivatives-20.js"></script>
 <script>renderBanks();</script>
 </body>
 </html>
