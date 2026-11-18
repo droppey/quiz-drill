@@ -60,7 +60,7 @@ const saved = { ...store };
 for (const k in store) delete store[k];
 run(`parseRecords(${JSON.stringify(backup)}).forEach(([k, v]) => localStorage.setItem(k, v))`);
 assert.deepStrictEqual({ ...store }, saved, "匯出再匯入後紀錄不一致");
-for (const bad of ["not json", '{"data":{}}', '{"data":{"x-quiz-v1":"{broken"}}', '{"data":{"evil":"1"}}'])
+for (const bad of [JSON.stringify({data:{"x-quiz-v1":JSON.stringify({randN:'"><img src=x onerror=alert(1)>'})}}), JSON.stringify({data:{"x-quiz-v1":'{"round":"<b>"}'}}), "not json", '{"data":{}}', '{"data":{"x-quiz-v1":"{broken"}}', '{"data":{"evil":"1"}}'])
   assert.throws(() => run(`parseRecords(${JSON.stringify(bad)})`), "壞檔案沒被拒絕：" + bad);
 
 // 混合隨機：從選到的題庫抽題，星等／收藏寫回各自的題庫；沒選到的題庫不動
@@ -72,6 +72,8 @@ run("S.scope='rand'; S.randN=99; startQuiz(); pick(S.pool[0], 1)");
 run("backToBanks(); selectMix()");  // 離開再回來要接著作答
 assert.deepStrictEqual([run("S.phase"), run("S.pool.length"), run("Object.keys(S.answers).length")], ["quiz", 4, 1], "混合模式沒接續進度");
 run("S.pool.forEach(i => pick(i, 1)); submitQuiz()");
+run("restart(); S.scope='rand'; startQuiz(); backToBanks(); selectMix()");  // 重來後離開再回來，題庫選擇與進度都要在
+assert.deepStrictEqual([run("S.phase"), run("BANK.mix.length")], ["quiz", 2], "混合模式重來後遺失進度");
 assert.deepStrictEqual(JSON.parse(store["quiz-m1-marks-v1"]), {0:{s:1,f:0}, 1:{s:1,f:0}});
 assert.deepStrictEqual(JSON.parse(store["quiz-m2-marks-v1"]), {0:{s:0,f:1}, 1:{s:0,f:1}});
 assert.strictEqual(store["quiz-t-marks-v1"], before, "混合模式動到沒選的題庫");

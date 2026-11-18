@@ -124,7 +124,7 @@ function renderBanks(){
     const favs = Object.values(mk).filter(m => m.f).length;
     const n = b.questions.length;
     // 星數進度 = 總星數 ÷ (題數 × 5)
-    const pct = n ? Math.round(b.questions.reduce((t, _, j) => t + ((mk[j] && mk[j].s) || 0), 0) / (n * 5) * 100) : 0;
+    const pct = n ? Math.floor(b.questions.reduce((t, _, j) => t + ((mk[j] && mk[j].s) || 0), 0) / (n * 5) * 100) : 0;
     const status = statusOf(st);
     return `<div class="bank" onclick="selectBank(${i})"><div class="t">${esc(b.title)}${status ? `<div class="hist" style="margin:0">${status}</div>` : ""}</div>
       <span class="meta"><span class="h">♥ x${favs}</span><span class="s">★ ${pct}%</span></span></div>`;
@@ -146,7 +146,8 @@ function exportRecords(){
 function parseRecords(text){
   const j = JSON.parse(text);
   const rows = Object.entries((j && j.data) || {}).filter(([k, v]) => RECORD_KEY.test(k) && typeof v === "string");
-  rows.forEach(([, v]) => JSON.parse(v));
+  // 紀錄裡的值會被放進畫面 HTML；正常紀錄不會有 < > 或字串內的引號，有就是被改過的檔案
+  rows.forEach(([, v]) => { JSON.parse(v); if (/[<>]|\\"/.test(v)) throw new Error("unsafe record"); });
   if (!rows.length) throw new Error("no records");
   return rows;
 }
@@ -184,7 +185,7 @@ function selectBank(i){
   }
   if (!S || !Array.isArray(S.pool) || (S.phase !== "setup" && !S.pool.length)) S = fresh();
   if (!S.scope) { S.scope = "all"; S.minStar = 3; }
-  if (S.phase === "done") S = Object.assign(fresh(), {scope:S.scope, minStar:S.minStar, randN:S.randN});
+  if (S.phase === "done") S = keepSettings();
   render(); window.scrollTo(0,0);
 }
 function backToBanks(){ renderBanks(); window.scrollTo(0,0); }
@@ -205,7 +206,7 @@ function selectMix(){
   buildMix(sel);
   // 題庫有補題或被移除 → 題號對不上，舊的作答狀態作廢
   if (!S || !Array.isArray(S.pool) || S.mixLen !== QUESTIONS.length || (S.phase !== "setup" && !S.pool.length)) S = Object.assign(fresh(), {scope:"rand", randN:20});
-  if (S.phase === "done") S = Object.assign(fresh(), {scope:S.scope, minStar:S.minStar, randN:S.randN});
+  if (S.phase === "done") S = keepSettings();
   S.mix = sel.map(i => bankKey(BANKS[i])); S.mixLen = QUESTIONS.length;
   $("title").textContent = BANK.title; $("subtitle").textContent = "勾選題庫後隨機抽題，星等與收藏會記回原題庫";
   document.title = "混合隨機｜刷題";
@@ -254,6 +255,8 @@ function toggleFav(qi){
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
 function fresh(){ return {round:1, pool:[], answers:{}, phase:"setup", lastWrong:[], history:[], scope:"all", minStar:3}; }
+// 重來但保留設定（範圍、星等、N、混合模式選的題庫）
+const keepSettings = () => Object.assign(fresh(), {scope:S.scope||"all", minStar:S.minStar??3, randN:S.randN||10, mix:S.mix, mixLen:S.mixLen});
 
 function scopePool(scope, minStar, randN){
   const all = QUESTIONS.map((_,i)=>i);
@@ -398,7 +401,7 @@ function retry(){
   S.round += 1; S.phase = "quiz";
   save(); render(); window.scrollTo(0,0);
 }
-function restart(){ const sc=S.scope, ms=S.minStar, rn=S.randN; S = fresh(); S.scope=sc||"all"; S.minStar=ms??3; S.randN=rn||10; save(); render(); window.scrollTo(0,0); }
+function restart(){ S = keepSettings(); save(); render(); window.scrollTo(0,0); }
 
 function render(){
   $("subtitle").style.display = S.phase === "setup" ? "" : "none";  // 作答中省空間，只留標題與進度
@@ -415,7 +418,7 @@ function render(){
 <script src="banks/tabf-derivatives-18.js"></script>
 <script src="banks/tabf-derivatives-19.js"></script>
 <script src="banks/tabf-derivatives-20.js"></script>
+<script src="banks/derivatives-intro.js"></script>
 <script>renderBanks();</script>
 </body>
 </html>
-<script src="banks/derivatives-intro.js"></script>
