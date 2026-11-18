@@ -51,6 +51,17 @@ h2{font-size:1.1rem;margin:22px 0 4px}
 .done{text-align:center;padding:40px 10px}
 .done .big{font-size:3rem}
 .hist{font-size:.88rem;color:var(--muted);margin-top:6px}
+.qhead{display:flex;align-items:center;gap:8px}
+.marks{margin-left:auto;display:flex;align-items:center;gap:2px}
+.marks button{background:none;padding:2px 3px;font-size:1.15rem;line-height:1;color:var(--line);font-weight:400}
+.marks button.on{color:#e3a008}
+.marks .fav{margin-left:6px;color:var(--line)}
+.marks .fav.on{color:#e0245e}
+.setup .choice{display:flex;align-items:center;gap:10px;padding:14px;margin:10px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;cursor:pointer}
+.setup .choice.sel{border-color:var(--accent);background:var(--accent-soft)}
+.setup .choice .n{margin-left:auto;color:var(--muted);font-size:.9rem}
+.setup select{font:inherit;padding:2px 6px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.linkbtn{background:none;padding:0;color:var(--muted);font-weight:400;font-size:.85rem;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -74,15 +85,65 @@ const NUM = ["①","②","③","④"];
 const KEY = "ifrs-deriv-quiz-v1";
 let S; // {round, pool:[idx], answers:{idx:choice}, phase:'quiz'|'result'|'done', lastWrong:[], history:[{round,total,correct}]}
 
+const MKEY = "ifrs-deriv-marks-v1";
+let M = {}; // {qi: {s:0-5, f:0|1}}
+try{ M = JSON.parse(localStorage.getItem(MKEY)) || {}; }catch(e){ M = {}; }
+function saveMarks(){ try{ localStorage.setItem(MKEY, JSON.stringify(M)); }catch(e){} }
+const star = i => (M[i] && M[i].s) || 0;
+const fav = i => (M[i] && M[i].f) || 0;
+
+function marksHTML(qi){
+  let h = `<span class="marks" id="mk${qi}">`;
+  for (let k=1;k<=5;k++) h += `<button class="${star(qi)>=k?"on":""}" onclick="setStar(${qi},${k})" aria-label="${k} 星">★</button>`;
+  h += `<button class="fav${fav(qi)?" on":""}" onclick="toggleFav(${qi})" aria-label="收藏">♥</button></span>`;
+  return h;
+}
+function refreshMarks(qi){
+  document.querySelectorAll(`#mk${qi}`).forEach(el => el.outerHTML = marksHTML(qi));
+}
+function setStar(qi, k){
+  M[qi] = {s: star(qi) === k ? 0 : k, f: fav(qi)};   // 再點同一顆星 = 清除
+  saveMarks(); refreshMarks(qi);
+}
+function toggleFav(qi){
+  M[qi] = {s: star(qi), f: fav(qi) ? 0 : 1};
+  saveMarks(); refreshMarks(qi);
+}
+
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
-function fresh(){ return {round:1, pool:QUESTIONS.map((_,i)=>i), answers:{}, phase:"quiz", lastWrong:[], history:[]}; }
+function fresh(){ return {round:1, pool:[], answers:{}, phase:"setup", lastWrong:[], history:[], scope:"all", minStar:3}; }
+
+function scopePool(scope, minStar){
+  const all = QUESTIONS.map((_,i)=>i);
+  if (scope === "fav") return all.filter(i => fav(i));
+  if (scope === "star") return all.filter(i => star(i) >= minStar);
+  return all;
+}
+function renderSetup(){
+  const ms = S.minStar || 3;
+  const c = {all:42, fav:scopePool("fav").length, star:scopePool("star", ms).length};
+  const opt = (v, label) => `<label class="choice${S.scope===v?" sel":""}"><input type="radio" name="scope" ${S.scope===v?"checked":""} onchange="S.scope='${v}';renderSetup()"> ${label}<span class="n">${c[v]} 題</span></label>`;
+  const sel = `<select onchange="S.minStar=+this.value;S.scope='star';renderSetup()" onclick="event.stopPropagation()">${[1,2,3,4,5].map(n=>`<option ${n===ms?"selected":""}>${n}</option>`).join("")}</select>`;
+  $("main").innerHTML = `<div class="setup"><h2>選擇練習範圍</h2>
+    ${opt("all","全部題目")}${opt("fav","♥ 只刷收藏")}${opt("star",`★ 只刷 ≥ ${sel} 星`)}</div>`;
+  const n = c[S.scope];
+  $("foot").innerHTML = `<span class="msg">${n?"":"這個範圍目前沒有題目"}</span><button class="primary" ${n?"":"disabled style='opacity:.4'"} onclick="startQuiz()">開始作答</button>`;
+  $("round").textContent = "準備"; $("count").textContent = ""; $("progbar").style.width = "0";
+}
+function startQuiz(){
+  S.pool = scopePool(S.scope, S.minStar || 3);
+  if (!S.pool.length) return;
+  S.answers = {}; S.round = 1; S.history = []; S.lastWrong = []; S.phase = "quiz";
+  save(); render(); window.scrollTo(0,0);
+}
+const scopeLabel = () => S.scope === "fav" ? "收藏題" : S.scope === "star" ? `≥${S.minStar}星` : "全部";
 
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 
 function header(){
-  $("round").textContent = S.round === 1 ? "第 1 輪" : `第 ${S.round} 輪・錯題重做`;
+  $("round").textContent = (S.round === 1 ? "第 1 輪" : `第 ${S.round} 輪・錯題`) + `（${scopeLabel()}）`;
   const n = S.pool.length, a = S.pool.filter(i => S.answers[i]).length;
   $("count").textContent = S.phase === "quiz" ? `已答 ${a}/${n}` : `共 ${n} 題`;
   $("progbar").style.width = (S.phase === "quiz" ? a/n*100 : 100) + "%";
@@ -95,10 +156,10 @@ function renderQuiz(){
       const v = j+1, sel = S.answers[qi] === v;
       return `<label class="opt${sel?" sel":""}"><input type="radio" name="q${qi}" value="${v}" ${sel?"checked":""} onchange="pick(${qi},${v})"><span>${NUM[j]} ${esc(t)}</span></label>`;
     }).join("");
-    return `<section class="q" id="card${qi}"><div class="no">${k+1}／${S.pool.length}　（原第 ${qi+1} 題）</div><div class="stem">${esc(Q.q)}</div>${opts}</section>`;
+    return `<section class="q" id="card${qi}"><div class="qhead"><span class="no">${k+1}／${S.pool.length}　（原第 ${qi+1} 題）</span>${marksHTML(qi)}</div><div class="stem">${esc(Q.q)}</div>${opts}</section>`;
   }).join("");
   $("main").innerHTML = html;
-  $("foot").innerHTML = `<span class="msg" id="msg"></span><button class="primary" onclick="submitQuiz()">交卷</button>`;
+  $("foot").innerHTML = `<button class="linkbtn" onclick="restart()">換範圍</button><span class="msg" id="msg"></span><button class="primary" onclick="submitQuiz()">交卷</button>`;
   header();
 }
 
@@ -120,6 +181,12 @@ function submitQuiz(){
   }
   confirmArmed = false;
   const wrong = S.pool.filter(i => S.answers[i] !== QUESTIONS[i].a);
+  // 自動星等：答對 +1（上限 5），答錯/未答 −1（下限 0）
+  S.pool.forEach(i => {
+    const ok = S.answers[i] === QUESTIONS[i].a;
+    M[i] = {s: Math.max(0, Math.min(5, star(i) + (ok ? 1 : -1))), f: fav(i)};
+  });
+  saveMarks();
   S.history.push({round:S.round, total:S.pool.length, correct:S.pool.length - wrong.length});
   S.lastWrong = wrong;
   S.phase = wrong.length ? "result" : "done";
@@ -136,7 +203,7 @@ function reviewCard(qi){
     return `<div class="opt${cls}"><span>${NUM[j]} ${esc(t)}</span>${tag?`<span class="tag">${tag}</span>`:""}</div>`;
   }).join("");
   const note = mine ? "" : `<div class="msg" style="margin-bottom:6px">未作答</div>`;
-  return `<section class="q"><div class="no">原第 ${qi+1} 題</div><div class="stem">${esc(Q.q)}</div>${note}${opts}<div class="exp"><b>解析</b>　${esc(Q.e)}</div></section>`;
+  return `<section class="q"><div class="qhead"><span class="no">原第 ${qi+1} 題</span>${marksHTML(qi)}</div><div class="stem">${esc(Q.q)}</div>${note}${opts}<div class="exp"><b>解析</b>　${esc(Q.e)}</div></section>`;
 }
 
 function histLine(){
@@ -154,14 +221,14 @@ function renderResult(){
     <div class="hist">${histLine()}</div>
     <h2>錯題檢視（${w} 題）</h2>
     ${S.lastWrong.map(reviewCard).join("")}`;
-  $("foot").innerHTML = `<button class="ghost" onclick="restart()">從頭再來</button><span style="flex:1"></span><button class="primary" onclick="retry()">重做錯題（${w} 題）</button>`;
+  $("foot").innerHTML = `<button class="ghost" onclick="restart()">換範圍／重來</button><span style="flex:1"></span><button class="primary" onclick="retry()">重做錯題（${w} 題）</button>`;
   header();
 }
 
 function renderDone(){
   const total = S.history.length;
   $("main").innerHTML = `<div class="done"><div class="big">🎉</div><h2>全部答對！</h2>
-    <p>${total === 1 ? "第一輪就全對，太強了。" : `經過 ${total} 輪，42 題全部拿下。`}</p>
+    <p>${total === 1 ? "第一輪就全對，太強了。" : `經過 ${total} 輪，${S.history[0].total} 題全部拿下。`}</p>
     <div class="hist">${histLine()}</div></div>`;
   $("foot").innerHTML = `<span style="flex:1"></span><button class="primary" onclick="restart()">重新開始</button>`;
   header();
@@ -173,16 +240,18 @@ function retry(){
   S.round += 1; S.phase = "quiz";
   save(); render(); window.scrollTo(0,0);
 }
-function restart(){ S = fresh(); save(); render(); window.scrollTo(0,0); }
+function restart(){ const sc=S.scope, ms=S.minStar; S = fresh(); S.scope=sc||"all"; S.minStar=ms||3; save(); render(); window.scrollTo(0,0); }
 
 function render(){
-  if (S.phase === "quiz") renderQuiz();
+  if (S.phase === "setup") renderSetup();
+  else if (S.phase === "quiz") renderQuiz();
   else if (S.phase === "result") renderResult();
   else renderDone();
 }
 
 S = load();
-if (!S || !Array.isArray(S.pool)) S = fresh();
+if (!S || !Array.isArray(S.pool) || (S.phase !== "setup" && !S.pool.length)) S = fresh();
+if (!S.scope) { S.scope = "all"; S.minStar = 3; }
 render();
 </script>
 </body>
