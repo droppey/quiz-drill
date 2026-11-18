@@ -84,7 +84,11 @@ h2{font-size:1.1rem;margin:22px 0 4px}
 const NUM = ["①","②","③","④","⑤","⑥"];
 // ---------- 題庫 ----------
 const BANKS = [];
-function registerBank(b){ BANKS.push(b); }
+function registerBank(b){
+  // 資料自檢：格式壞掉的題目會在 console 報錯
+  b.questions.forEach((x,i)=>{ if(!x.q||!x.e||!(x.o.length>=2&&x.o.length<=NUM.length)||!(x.a>=1&&x.a<=x.o.length)) console.error("bad question", b.id, i+1); });
+  BANKS.push(b);
+}
 let BANK = null, QUESTIONS = [], KEY = "", MKEY = "";
 const bankKey = b => b.storageKey || ("quiz-" + b.id);
 function readJSON(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
@@ -126,6 +130,10 @@ function selectBank(i){
   $("title").textContent = BANK.title; $("subtitle").textContent = `${QUESTIONS.length} 題・${BANK.desc || ""}`;
   document.title = BANK.title.replace(/\s+/g, " ") + "｜刷題";
   S = load();
+  if (S && Array.isArray(S.pool)){  // 題庫縮短後，丟掉已不存在的題號
+    S.pool = S.pool.filter(i => i < QUESTIONS.length);
+    S.lastWrong = (S.lastWrong || []).filter(i => i < QUESTIONS.length);
+  }
   if (!S || !Array.isArray(S.pool) || (S.phase !== "setup" && !S.pool.length)) S = fresh();
   if (!S.scope) { S.scope = "all"; S.minStar = 3; }
   if (S.phase === "done") S = Object.assign(fresh(), {scope:S.scope, minStar:S.minStar});
@@ -165,27 +173,27 @@ function fresh(){ return {round:1, pool:[], answers:{}, phase:"setup", lastWrong
 function scopePool(scope, minStar){
   const all = QUESTIONS.map((_,i)=>i);
   if (scope === "fav") return all.filter(i => fav(i));
-  if (scope === "star") return all.filter(i => star(i) >= minStar);
+  if (scope === "star") return all.filter(i => star(i) <= minStar);
   return all;
 }
 function renderSetup(){
-  const ms = S.minStar || 3;
+  const ms = S.minStar ?? 3;
   const c = {all:QUESTIONS.length, fav:scopePool("fav").length, star:scopePool("star", ms).length};
   const opt = (v, label) => `<label class="choice${S.scope===v?" sel":""}"><input type="radio" name="scope" ${S.scope===v?"checked":""} onchange="S.scope='${v}';renderSetup()"> ${label}<span class="n">${c[v]} 題</span></label>`;
-  const sel = `<select onchange="S.minStar=+this.value;S.scope='star';renderSetup()" onclick="event.stopPropagation()">${[1,2,3,4,5].map(n=>`<option ${n===ms?"selected":""}>${n}</option>`).join("")}</select>`;
+  const sel = `<select onchange="S.minStar=+this.value;S.scope='star';renderSetup()" onclick="event.stopPropagation()">${[0,1,2,3,4,5].map(n=>`<option ${n===ms?"selected":""}>${n}</option>`).join("")}</select>`;
   $("main").innerHTML = `<div class="setup"><h2>選擇練習範圍</h2>
-    ${opt("all","全部題目")}${opt("fav","♥ 只刷收藏")}${opt("star",`★ 只刷 ≥ ${sel} 星`)}</div>`;
+    ${opt("all","全部題目")}${opt("fav","♥ 只刷收藏")}${opt("star",`★ 只刷 ≤ ${sel} 星`)}</div>`;
   const n = c[S.scope];
   $("foot").innerHTML = `<button class="ghost" onclick="backToBanks()">‹ 題庫</button><span class="msg">${n?"":"這個範圍目前沒有題目"}</span><button class="primary" ${n?"":"disabled style='opacity:.4'"} onclick="startQuiz()">開始作答</button>`;
   $("round").textContent = "準備"; $("count").textContent = ""; $("progbar").style.width = "0";
 }
 function startQuiz(){
-  S.pool = scopePool(S.scope, S.minStar || 3);
+  S.pool = scopePool(S.scope, S.minStar ?? 3);
   if (!S.pool.length) return;
   S.answers = {}; S.round = 1; S.history = []; S.lastWrong = []; S.phase = "quiz";
   save(); render(); window.scrollTo(0,0);
 }
-const scopeLabel = () => S.scope === "fav" ? "收藏題" : S.scope === "star" ? `≥${S.minStar}星` : "全部";
+const scopeLabel = () => S.scope === "fav" ? "收藏題" : S.scope === "star" ? `≤${S.minStar}星` : "全部";
 
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
@@ -198,6 +206,7 @@ function header(){
 }
 
 function renderQuiz(){
+  confirmArmed = false;
   const html = S.pool.map((qi, k) => {
     const Q = QUESTIONS[qi];
     const opts = Q.o.map((t, j) => {
@@ -229,10 +238,10 @@ function submitQuiz(){
   }
   confirmArmed = false;
   const wrong = S.pool.filter(i => S.answers[i] !== QUESTIONS[i].a);
-  // 自動星等：答對 +1（上限 5），答錯/未答 −1（下限 0）
+  // 自動星等：答對 +1（上限 5），答錯/未答 −1（下限 0）；答錯/未答自動收藏
   S.pool.forEach(i => {
     const ok = S.answers[i] === QUESTIONS[i].a;
-    M[i] = {s: Math.max(0, Math.min(5, star(i) + (ok ? 1 : -1))), f: fav(i)};
+    M[i] = {s: Math.max(0, Math.min(5, star(i) + (ok ? 1 : -1))), f: ok ? fav(i) : 1};
   });
   saveMarks();
   S.history.push({round:S.round, total:S.pool.length, correct:S.pool.length - wrong.length});
@@ -288,7 +297,7 @@ function retry(){
   S.round += 1; S.phase = "quiz";
   save(); render(); window.scrollTo(0,0);
 }
-function restart(){ const sc=S.scope, ms=S.minStar; S = fresh(); S.scope=sc||"all"; S.minStar=ms||3; save(); render(); window.scrollTo(0,0); }
+function restart(){ const sc=S.scope, ms=S.minStar; S = fresh(); S.scope=sc||"all"; S.minStar=ms??3; save(); render(); window.scrollTo(0,0); }
 
 function render(){
   if (S.phase === "setup") renderSetup();
