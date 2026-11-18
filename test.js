@@ -63,6 +63,21 @@ assert.deepStrictEqual({ ...store }, saved, "匯出再匯入後紀錄不一致")
 for (const bad of ["not json", '{"data":{}}', '{"data":{"x-quiz-v1":"{broken"}}', '{"data":{"evil":"1"}}'])
   assert.throws(() => run(`parseRecords(${JSON.stringify(bad)})`), "壞檔案沒被拒絕：" + bad);
 
+// 混合隨機：從選到的題庫抽題，星等／收藏寫回各自的題庫；沒選到的題庫不動
+run(`registerBank({id:"m1", title:"M1", questions:[0,1].map(i => ({q:"x"+i, o:["a","b"], a:1, e:"e"}))})`);
+run(`registerBank({id:"m2", title:"M2", questions:[0,1].map(i => ({q:"y"+i, o:["a","b"], a:2, e:"e"}))})`);
+const before = store["quiz-t-marks-v1"];
+run("selectMix(); BANK.mix.slice().forEach(toggleMix); toggleMix(BANKS.length-2); toggleMix(BANKS.length-1)");
+run("S.scope='rand'; S.randN=99; startQuiz(); pick(S.pool[0], 1)");
+run("backToBanks(); selectMix()");  // 離開再回來要接著作答
+assert.deepStrictEqual([run("S.phase"), run("S.pool.length"), run("Object.keys(S.answers).length")], ["quiz", 4, 1], "混合模式沒接續進度");
+run("S.pool.forEach(i => pick(i, 1)); submitQuiz()");
+assert.deepStrictEqual(JSON.parse(store["quiz-m1-marks-v1"]), {0:{s:1,f:0}, 1:{s:1,f:0}});
+assert.deepStrictEqual(JSON.parse(store["quiz-m2-marks-v1"]), {0:{s:0,f:1}, 1:{s:0,f:1}});
+assert.strictEqual(store["quiz-t-marks-v1"], before, "混合模式動到沒選的題庫");
+assert.ok(store["mix-quiz-v1"], "混合模式沒存進度");
+run("backToBanks()");
+
 // 題庫檔防呆：id 重複不載入、選項打錯字只報錯不崩潰、空題庫不顯示 NaN
 const n = run("BANKS.length");
 run(`registerBank({id:"t", title:"複製忘了改 id", questions:[]})`);
