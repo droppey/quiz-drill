@@ -8,6 +8,7 @@ const ctx = vm.createContext({
   localStorage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } },
   document: { title: "", getElementById: id => els[id] || (els[id] = el()), querySelectorAll: () => [] },
   window: { scrollTo() {} },
+  setInterval() {},
   console: { ...console, error: (...a) => errors.push(a.join(" ")) },
 });
 const run = code => vm.runInContext(code, ctx);
@@ -36,6 +37,15 @@ assert.strictEqual(val("S.phase"), "quiz", "換範圍後交卷沒有警告未作
 run("pick(1, 1); submitQuiz()");  // 上面已警告過一次，這次按交卷就送出
 assert.deepStrictEqual(val("[star(1), fav(1), star(2), fav(2), star(0)]"), [1, 0, 0, 1, 2]);
 assert.deepStrictEqual(val("S.lastWrong"), [2]);
+
+// 計時：格式正確；全部答對後停止；重新開始後歸零
+assert.deepStrictEqual(val("[fmtTime(65000), fmtTime(3725000)]"), ["1:05", "1:02:05"]);
+run("restart(); S.scope='all'; startQuiz(); S.startedAt -= 5000; [0,1,2].forEach(i => pick(i, 1)); submitQuiz()");
+assert.strictEqual(val("S.phase"), "done");
+const t1 = run("elapsed()");
+assert.ok(t1 >= 5000 && t1 === run("elapsed()"), "全部答對後計時沒停");
+run("restart()");
+assert.strictEqual(run("S.startedAt"), undefined, "重新開始後計時沒歸零");
 
 // 隨機挑 N 題：N 題不重複、都在題庫內；N 大於題數時就是全部
 run("restart(); S.scope='rand'; S.randN=2; startQuiz()");
