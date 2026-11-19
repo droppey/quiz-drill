@@ -21,6 +21,18 @@ for (const [, src, body] of fs.readFileSync(__dirname + "/index.html", "utf8").m
 assert.deepStrictEqual(errors, [], "題庫資料有錯：\n" + errors.join("\n"));
 assert.ok(run("BANKS.length") > 0, "沒有載入任何題庫");
 
+// 大題庫：每個題庫都有歸屬；第一次進站先選大題庫；選過之後再進站直接進上次的大題庫，清單只列該大題庫的題庫
+assert.ok(run("GROUPS.length") > 1 && run("BANKS.every(b => GROUPS.includes(b.group))"), "有題庫沒有大題庫");
+assert.strictEqual(run("GROUP"), null, "第一次進站應先選大題庫");
+run("selectGroup(GROUPS[0])");
+assert.strictEqual(store["group-v1"], run("GROUPS[0]"), "沒記住選的大題庫");
+assert.deepStrictEqual([...els.main.innerHTML.matchAll(/selectBank\((\d+)\)/g)].map(m => +m[1]), val("BANKS.map((b, i) => b.group === GROUPS[0] ? i : -1).filter(i => i >= 0)"), "清單應剛好列出這個大題庫的題庫");
+run("renderGroups(); home()");
+assert.strictEqual(run("GROUP"), run("GROUPS[0]"), "再進站沒回到上次的大題庫");
+run("selectMix()");
+assert.ok(run("BANK.mix.every(i => BANKS[i].group === GROUPS[0])"), "混合隨機混到別的大題庫");
+run("selectGroup(GROUPS[GROUPS.length-1])");  // 下面的測試題庫會歸到最後一個大題庫
+
 // 用一個 3 題的測試題庫檢查規則
 run(`registerBank({id:"t", title:"測試", questions:[0,1,2].map(i => ({q:"q"+i, o:["a","b"], a:1, e:"e"}))}); selectBank(BANKS.length-1)`);
 run("setStar(0, 2)");
@@ -57,6 +69,7 @@ assert.deepStrictEqual(val("[...S.pool].sort()"), [0, 1, 2]);
 // 備份：匯出再匯入要還原紀錄；壞檔案要整個拒絕
 const backup = run("exportRecords()");
 const saved = { ...store };
+delete saved["group-v1"];  // 上次選的大題庫是這台裝置的偏好，不算紀錄、不進備份
 for (const k in store) delete store[k];
 run(`parseRecords(${JSON.stringify(backup)}).forEach(([k, v]) => localStorage.setItem(k, v))`);
 assert.deepStrictEqual({ ...store }, saved, "匯出再匯入後紀錄不一致");
