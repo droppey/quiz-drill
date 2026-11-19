@@ -21,6 +21,18 @@ for (const [, src, body] of fs.readFileSync(__dirname + "/index.html", "utf8").m
 assert.deepStrictEqual(errors, [], "題庫資料有錯：\n" + errors.join("\n"));
 assert.ok(run("BANKS.length") > 0, "沒有載入任何題庫");
 
+// 題目只能加在最後：跟線上版（origin/main，大家的紀錄對應的版本）比，舊題庫都還在（id／storageKey 沒改）、舊題目的位置沒變（不能插入、刪除、重排）
+const git = c => require("child_process").execSync("git " + c, { cwd: __dirname, encoding: "utf8", maxBuffer: 1 << 26 });
+const oldBanks = [], octx = vm.createContext({ registerBank: b => oldBanks.push(b) });
+for (const f of git("ls-tree -r --name-only origin/main banks").split("\n").filter(f => f.endsWith(".js")))
+  vm.runInContext(git(`show "origin/main:${f}"`), octx);
+for (const o of oldBanks) {
+  const k = o.storageKey || "quiz-" + o.id, b = run("BANKS").find(b => run("bankKey")(b) === k);
+  assert.ok(b, `題庫 ${o.id} 不見了或改了 id／storageKey（舊紀錄會讀不到）`);
+  const i = o.questions.findIndex((q, i) => !b.questions[i] || b.questions[i].q !== q.q);
+  assert.ok(i < 0, `${o.id} 第 ${i + 1} 題跟線上版不同：題目只能加在最後（若只是故意修錯字，確認 git diff 只有這處後 push 即可）`);
+}
+
 // 大題庫：每個題庫都有歸屬；第一次進站先選大題庫；選過之後再進站直接進上次的大題庫，清單只列該大題庫的題庫
 assert.ok(run("GROUPS.length") > 1 && run("BANKS.every(b => GROUPS.includes(b.group))"), "有題庫沒有大題庫");
 assert.strictEqual(run("GROUP"), null, "第一次進站應先選大題庫");
@@ -101,5 +113,11 @@ run(`registerBank({id:"empty", title:"空題庫", questions:[]}); renderBanks()`
 assert.strictEqual(run("BANKS.length"), n + 2, "重複 id 的題庫不該載入");
 assert.deepStrictEqual(errors, ["duplicate bank id t", "bad question typo 1"]);
 assert.ok(!els.main.innerHTML.includes("NaN"), "空題庫顯示 NaN");
+
+// 混合隨機：換到別的大題庫，即使總題數剛好一樣，也不能接續別的大題庫的進度
+run(`group("G1"); registerBank({id:"g1", title:"G1", questions:[0,1].map(i => ({q:"g"+i, o:["a","b"], a:1, e:"e"}))})`);
+run(`group("G2"); registerBank({id:"g2", title:"G2", questions:[0,1].map(i => ({q:"h"+i, o:["a","b"], a:1, e:"e"}))})`);
+run("selectGroup('G1'); selectMix(); S.scope='all'; startQuiz(); pick(0, 1); backToBanks(); selectGroup('G2'); selectMix()");
+assert.deepStrictEqual([run("S.phase"), Object.keys(val("S.answers")).length], ["setup", 0], "混合隨機接續了別的大題庫的進度");
 
 console.log("OK：所有規則測試通過");
