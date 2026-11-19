@@ -20,7 +20,7 @@ node test.js   # 檢查題庫格式與計分規則，應印出「OK：所有規�
 
 ## 題庫
 
-### 衍生性金融商品
+<details><summary><b>衍生性金融商品</b>（7 個題庫・581 題）</summary>
 
 | 檔案 | 題庫 | 題數 |
 |---|---|---|
@@ -32,7 +32,9 @@ node test.js   # 檢查題庫格式與計分規則，應印出「OK：所有規�
 | `banks/derivatives/tabf-derivatives-19.js` | 衍生性金融商品銷售人員資格測驗　第 19 期 | 60 |
 | `banks/derivatives/tabf-derivatives-20.js` | 衍生性金融商品銷售人員資格測驗　第 20 期 | 60 |
 
-### 期貨商業務員
+</details>
+
+<details><summary><b>期貨商業務員</b>（10 個題庫・500 題）</summary>
 
 | 檔案 | 題庫 | 題數 |
 |---|---|---|
@@ -47,7 +49,9 @@ node test.js   # 檢查題庫格式與計分規則，應印出「OK：所有規�
 | `banks/futures/futures-law-115-2.js` | 期貨商業務員　115 年第 2 次　期貨交易法規 | 50 |
 | `banks/futures/futures-practice-115-2.js` | 期貨商業務員　115 年第 2 次　期貨交易理論與實務 | 50 |
 
-### 證券商高級業務員
+</details>
+
+<details><summary><b>證券商高級業務員</b>（42 個題庫・2095 題）</summary>
 
 | 檔案 | 題庫 | 題數 |
 |---|---|---|
@@ -93,6 +97,8 @@ node test.js   # 檢查題庫格式與計分規則，應印出「OK：所有規�
 | `banks/senior/senior-invest-115-2.js` | 證券商高級業務員　115 年第 2 次　投資學 | 50 |
 | `banks/senior/senior-finance-115-2.js` | 證券商高級業務員　115 年第 2 次　財務分析 | 50 |
 | `banks/senior/senior-law-115-2.js` | 證券商高級業務員　115 年第 2 次　證券交易相關法規與實務 | 50 |
+
+</details>
 
 
 ### 新增題庫
