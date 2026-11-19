@@ -24,9 +24,21 @@ node test.js   # 檢查題庫格式與計分規則，應印出「OK：所有規�
 |---|---|---|
 | `banks/derivatives-intro.js` | 第一篇 衍生性商品概論 | 239 |
 | `banks/ifrs-derivatives.js` | 第二篇 衍生性商品之會計處理 | 42 |
+| `banks/tabf-derivatives-16.js` | 衍生性金融商品銷售人員資格測驗　第 16 期 | 60 |
+| `banks/tabf-derivatives-17.js` | 衍生性金融商品銷售人員資格測驗　第 17 期 | 60 |
 | `banks/tabf-derivatives-18.js` | 衍生性金融商品銷售人員資格測驗　第 18 期 | 60 |
 | `banks/tabf-derivatives-19.js` | 衍生性金融商品銷售人員資格測驗　第 19 期 | 60 |
 | `banks/tabf-derivatives-20.js` | 衍生性金融商品銷售人員資格測驗　第 20 期 | 60 |
+| `banks/futures-law-114-1.js` | 期貨商業務員　114 年第 1 次　期貨交易法規 | 50 |
+| `banks/futures-practice-114-1.js` | 期貨商業務員　114 年第 1 次　期貨交易理論與實務 | 50 |
+| `banks/futures-law-114-2.js` | 期貨商業務員　114 年第 2 次　期貨交易法規 | 50 |
+| `banks/futures-practice-114-2.js` | 期貨商業務員　114 年第 2 次　期貨交易理論與實務 | 50 |
+| `banks/futures-law-114-3.js` | 期貨商業務員　114 年第 3 次　期貨交易法規 | 50 |
+| `banks/futures-practice-114-3.js` | 期貨商業務員　114 年第 3 次　期貨交易理論與實務 | 50 |
+| `banks/futures-law-115-1.js` | 期貨商業務員　115 年第 1 次　期貨交易法規 | 50 |
+| `banks/futures-practice-115-1.js` | 期貨商業務員　115 年第 1 次　期貨交易理論與實務 | 50 |
+| `banks/futures-law-115-2.js` | 期貨商業務員　115 年第 2 次　期貨交易法規 | 50 |
+| `banks/futures-practice-115-2.js` | 期貨商業務員　115 年第 2 次　期貨交易理論與實務 | 50 |
 
 
 ### 新增題庫
