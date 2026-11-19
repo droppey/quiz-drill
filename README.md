@@ -20,12 +20,13 @@ node test.js   # 檢查題庫格式與計分規則，應印出「OK：所有規�
 
 ## 題庫
 
-<details><summary><b>衍生性金融商品</b>（7 個題庫・581 題）</summary>
+<details><summary><b>衍生性金融商品</b>（8 個題庫・750 題）</summary>
 
 | 檔案 | 題庫 | 題數 |
 |---|---|---|
 | `banks/derivatives/derivatives-intro.js` | 第一篇 衍生性商品概論 | 239 |
 | `banks/derivatives/ifrs-derivatives.js` | 第二篇 衍生性商品之會計處理 | 42 |
+| `banks/derivatives/derivatives-law.js` | 第三篇 衍生性商品相關法規 | 169 |
 | `banks/derivatives/tabf-derivatives-16.js` | 衍生性金融商品銷售人員資格測驗　第 16 期 | 60 |
 | `banks/derivatives/tabf-derivatives-17.js` | 衍生性金融商品銷售人員資格測驗　第 17 期 | 60 |
 | `banks/derivatives/tabf-derivatives-18.js` | 衍生性金融商品銷售人員資格測驗　第 18 期 | 60 |
