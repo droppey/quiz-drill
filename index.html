@@ -159,7 +159,7 @@ function renderBanks(){
   }).join("") || "<p>沒有題庫</p>"}</div>`;
   $("foot").innerHTML = (GROUPS.length > 1 ? `<button class="ghost" onclick="renderGroups();window.scrollTo(0,0)">‹ 大題庫</button>` : "") + backupButtons;
 }
-const backupButtons = `<button class="ghost" onclick="exportFile()">匯出紀錄</button><button class="ghost" onclick="$('imp').click()">匯入紀錄</button><input type="file" id="imp" accept=".json,application/json" hidden onchange="importFile(this.files[0]);this.value=''"><span style="flex:1"></span>`;
+const backupButtons = `<button class="ghost" onclick="renderBackup()">備份／還原</button><span style="flex:1"></span>`;
 
 // ---------- 備份：匯出／匯入所有題庫的進度與標記 ----------
 const RECORD_KEY = /-(quiz|marks)-v1$/;
@@ -188,15 +188,42 @@ function exportFile(){
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }catch(e){ alert("匯出失敗：" + e.message); }
 }
+// 合併：星等取較高、收藏兩邊有一邊有就留；作答進度留開始時間較晚的那份
+function mergeRecord(k, v){
+  const mine = readJSON(k), theirs = JSON.parse(v) || {};
+  if (/-quiz-v1$/.test(k)) return mine && (mine.startedAt || 0) > (theirs.startedAt || 0) ? null : v;
+  const out = mine || {};
+  for (const j in theirs){
+    const a = out[j] || {}, b = theirs[j] || {};
+    out[j] = {s: Math.min(5, Math.max(+a.s || 0, +b.s || 0)), f: a.f || b.f ? 1 : 0};
+  }
+  return JSON.stringify(out);
+}
+function importText(t){
+  let rows;
+  try{ rows = parseRecords(t); }catch(e){ return alert("格式不對，沒有匯入。"); }
+  if (!confirm(`匯入 ${rows.length} 筆紀錄？會和這台裝置的紀錄合併（星等取較高、收藏都保留）。`)) return;
+  try{ rows.forEach(([k, v]) => { const m = mergeRecord(k, v); if (m != null) localStorage.setItem(k, m); }); }
+  catch(e){ return alert("匯入失敗：" + e.message); }
+  backFromBackup();
+}
 function importFile(file){
-  if (!file) return;
-  file.text().then(t => {
-    let rows;
-    try{ rows = parseRecords(t); }catch(e){ return alert("檔案格式不對，沒有匯入。"); }
-    if (!confirm(`匯入 ${rows.length} 筆紀錄？這台裝置上相同題庫的紀錄會被覆蓋。`)) return;
-    rows.forEach(([k, v]) => localStorage.setItem(k, v));
-    GROUP ? renderBanks() : renderGroups();  // 留在原本的畫面（大題庫清單或題庫清單）
-  }).catch(e => alert("匯入失敗：" + e.message));
+  if (file) file.text().then(importText).catch(e => alert("匯入失敗：" + e.message));
+}
+const backFromBackup = () => { GROUP ? renderBanks() : renderGroups(); window.scrollTo(0,0); };  // 回到原本的畫面（大題庫清單或題庫清單）
+function renderBackup(){
+  $("round").textContent = "備份"; $("count").textContent = ""; $("progbar").style.width = "0";
+  $("main").innerHTML = `<div class="setup"><h2>備份／還原</h2>
+    <p>把下面的文字複製起來傳到另一台裝置（例如用 LINE 傳給自己），在那邊清空框框、貼上，再按「匯入」。匯入會合併：星等取較高、收藏兩邊都保留。</p>
+    <textarea id="bk" rows="8" style="width:100%;box-sizing:border-box;font:inherit;font-size:.8rem" onfocus="this.select()">${esc(exportRecords())}</textarea>
+    <p><button class="ghost" onclick="exportFile()">下載成檔案</button> <button class="ghost" onclick="$('imp').click()">從檔案匯入</button><input type="file" id="imp" accept=".json,application/json" hidden onchange="importFile(this.files[0]);this.value=''"></p></div>`;
+  $("foot").innerHTML = `<button class="ghost" onclick="backFromBackup()">‹ 返回</button><span class="msg" id="bkmsg"></span><button class="ghost" onclick="copyBackup()">複製</button><button class="primary" onclick="importText($('bk').value)">匯入</button>`;
+  window.scrollTo(0,0);
+}
+function copyBackup(){
+  const t = $("bk"); t.select();
+  const done = ok => $("bkmsg").textContent = ok ? "已複製" : "請手動全選後複製";
+  navigator.clipboard ? navigator.clipboard.writeText(t.value).then(() => done(1), () => done(document.execCommand("copy"))) : done(document.execCommand("copy"));
 }
 // 請瀏覽器不要自動清掉這個網站的資料（不支援就略過）
 if (typeof navigator !== "undefined" && navigator.storage && navigator.storage.persist) navigator.storage.persist();

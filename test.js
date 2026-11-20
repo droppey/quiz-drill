@@ -88,6 +88,15 @@ assert.deepStrictEqual({ ...store }, saved, "匯出再匯入後紀錄不一致")
 for (const bad of [JSON.stringify({data:{"x-quiz-v1":JSON.stringify({randN:'"><img src=x onerror=alert(1)>'})}}), JSON.stringify({data:{"x-quiz-v1":'{"round":"<b>"}'}}), "not json", '{"data":{}}', '{"data":{"x-quiz-v1":"{broken"}}', '{"data":{"evil":"1"}}'])
   assert.throws(() => run(`parseRecords(${JSON.stringify(bad)})`), "壞檔案沒被拒絕：" + bad);
 
+// 合併匯入：星等取較高、收藏聯集、本機沒有的題目照收；進度留開始時間較晚的
+store["mg-marks-v1"] = JSON.stringify({0:{s:4,f:0}, 1:{s:1,f:1}});
+assert.deepStrictEqual(JSON.parse(run(`mergeRecord("mg-marks-v1", ${JSON.stringify(JSON.stringify({0:{s:2,f:1}, 1:{s:3,f:0}, 2:{s:5,f:0}}))})`)),
+  {0:{s:4,f:1}, 1:{s:3,f:1}, 2:{s:5,f:0}}, "星等／收藏合併錯誤");
+store["mg-quiz-v1"] = JSON.stringify({startedAt: 200});
+assert.strictEqual(run(`mergeRecord("mg-quiz-v1", '{"startedAt":100}')`), null, "較舊的進度蓋掉了本機較新的進度");
+assert.strictEqual(run(`mergeRecord("mg-quiz-v1", '{"startedAt":300}')`), '{"startedAt":300}', "較新的進度沒匯入");
+delete store["mg-marks-v1"]; delete store["mg-quiz-v1"];
+
 // 混合隨機：從選到的題庫抽題，星等／收藏寫回各自的題庫；沒選到的題庫不動
 run(`registerBank({id:"m1", title:"M1", questions:[0,1].map(i => ({q:"x"+i, o:["a","b"], a:1, e:"e"}))})`);
 run(`registerBank({id:"m2", title:"M2", questions:[0,1].map(i => ({q:"y"+i, o:["a","b"], a:2, e:"e"}))})`);
